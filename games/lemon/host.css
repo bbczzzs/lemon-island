@@ -1,0 +1,12 @@
+/* Wide tycoon layout on desktop; tall frame on portrait phones. */
+:root {
+  --rf-game-max-width: 1200px;
+  --rf-game-aspect-ratio: 16 / 9;
+}
+
+@media (max-width: 640px) and (orientation: portrait) {
+  :root {
+    --rf-game-max-width: 480px;
+    --rf-game-aspect-ratio: 9 / 17;
+  }
+}
