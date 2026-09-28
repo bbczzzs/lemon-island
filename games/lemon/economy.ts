@@ -17,7 +17,7 @@ export const rfOf = (n: number): bigint => BigInt(Math.round(n * 100)) * ONE_RF 
 export const toRf = (v: bigint): number => Number((v * 100n) / ONE_RF) / 100;
 
 export const START_BALANCE = rfOf(100);
-export const CUPS_PER_LEMON = 4;
+export const CUPS_PER_LEMON = 2;
 export const DAY_SECONDS = 36;
 export const SPOIL_SHARE = 0.25; // leftover lemons that rot overnight
 export const BASE_LEMON = 0.5; // RF per lemon at a calm market
@@ -42,7 +42,7 @@ export interface Build {
   blurb: string;
 }
 export const BUILDS: Build[] = [
-  { id: "stand", name: "Lemon Stand", cost: 40, kind: "stall", max: 2, blurb: "Another stand on the path. More cups, shorter queues." },
+  { id: "stand", name: "Lemon Stand", cost: 40, kind: "stall", max: 2, blurb: "A second stand further down the beach catches more thirsty Friends." },
   { id: "cart", name: "Ice Pop Cart", cost: 70, kind: "stall", max: 1, blurb: "Sells frozen pops at 1.4× price. Loves heatwaves, hates rain." },
   { id: "bar", name: "Juice Bar", cost: 150, kind: "stall", max: 1, blurb: "Premium fizz at 2× price. Uses 2× lemons." },
   { id: "umbrella", name: "Umbrellas", cost: 30, kind: "upgrade", max: 1, blurb: "Rainy days aren't a washout any more." },

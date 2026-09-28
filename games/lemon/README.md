@@ -10,7 +10,7 @@ Built with FriendSDK **v0.1.2** for the Rare Friends Vibeathon · Category: **Ec
 
 Each day is about 36 seconds:
 
-1. **Morning.** Check the weather forecast, buy lemons at the **market** (1 lemon = 4 cups) and set your **cup price**.
+1. **Morning.** Check the weather forecast, buy lemons at the **market** (1 lemon = 2 cups) and set your **cup price**.
 2. **Open.** Real Rare Friends arrive by ferry and walk the boardwalk. Thirsty ones compare your price with what they'll pay today. Cheap enough means they queue, too expensive gets a "TOO $$$", and running out means "SOLD OUT".
 3. **Evening.** A report card shows cups sold, sales, costs and profit. A quarter of leftover lemons rot overnight, so plan your stock.
 4. **Grow.** Reinvest in more **Lemon Stands**, an **Ice Pop Cart** (1.4× price, loves heatwaves), a **Juice Bar** (2× price, 2× lemons), **Umbrellas**, **Big Jugs**, a **Neon Sign**, a **Lemon Grove** (12 free lemons a day) and a **Tour Balloon** (+35% tourists).
@@ -67,4 +67,4 @@ Controls: **Space** opens the day or starts the next one · **[ ]** change price
 
 ## Credits
 
-All art is drawn in code and all audio is synthesized with WebAudio. Friend sprites are canonical Rare Friends Generations artwork via FriendSDK (`NOTICE.md`). Fonts: Silkscreen, Sometype Mono and Archivo (SIL OFL, bundled). Built with Claude Code.
+All art (scene and pixel UI icons) is drawn in code and all audio is synthesized with WebAudio. Friend sprites are canonical Rare Friends Generations artwork via FriendSDK (`NOTICE.md`). Fonts: Silkscreen, Sometype Mono and Archivo (SIL OFL, bundled). Built with Claude Code.

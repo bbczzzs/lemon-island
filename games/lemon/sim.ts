@@ -26,6 +26,7 @@ export interface Walker {
   lane: number; // 0..1 depth offset on the path
   speed: number;
   thirsty: boolean;
+  thirstAt: number; // where on the beach they start looking for a drink (more stalls = more reach)
   maxPay: number;
   bought: boolean;
   queuedAt: Stall | null;
@@ -39,7 +40,14 @@ export type SimEvent =
   | { type: "pricey"; stall: Stall; walker: Walker }
   | { type: "soldout"; stall: Stall; walker: Walker };
 
-export const STALL_SLOTS = [0.34, 0.54, 0.72, 0.2, 0.86];
+/** Walkers on screen at once — kept low so the beach stays readable. */
+const MAX_WALKERS = 18;
+
+export const STALL_SLOTS = [0.32, 0.55, 0.78, 0.1, 0.96];
+
+/** Queues form beside the stall (to its left) so the counter stays readable. */
+const QUEUE_FRONT = 0.085, QUEUE_GAP = 0.055, QUEUE_MAX = 3;
+const queueSpot = (s: Stall, idx: number) => s.u - QUEUE_FRONT - QUEUE_GAP * idx;
 
 export interface SimCtx {
   open: boolean;
@@ -75,7 +83,7 @@ export class Island {
   walkersPerSecond(ctx: SimCtx): number {
     if (!ctx.open) return 0.35;
     const w = WEATHER[ctx.weather];
-    return 1.3 * w.walkers * (1 + ctx.reputation * 0.7) * (ctx.upgrades.has("balloon") ? 1.35 : 1);
+    return 2.0 * w.walkers * (1 + ctx.reputation * 0.5) * (ctx.upgrades.has("balloon") ? 1.35 : 1);
   }
 
   willingness(ctx: SimCtx): { thirst: number; pay: number } {
@@ -86,17 +94,26 @@ export class Island {
     return { thirst, pay };
   }
 
-  private spawn(ctx: SimCtx) {
-    if (this.walkers.length >= 48) return;
+  /** Adds a walker at `u` (default: off-screen at the ferry). */
+  private spawn(ctx: SimCtx, u = -0.08) {
+    if (this.walkers.length >= MAX_WALKERS) return;
+    // Keep gaps so the crowd walks in a tidy, readable line.
+    if (this.walkers.some(w => !w.queuedAt && Math.abs(w.u - u) < 0.05)) return;
     const r = this.rand;
     const { thirst, pay } = this.willingness(ctx);
     const friend = this.roster[Math.floor(r() * this.roster.length)];
     this.walkers.push({
-      id: this.nextId++, friend, u: -0.08, lane: r(), speed: 0.036 + r() * 0.02,
-      thirsty: ctx.open && r() < thirst,
-      maxPay: 0.5 * pay * (0.6 + r() * 0.9) * (1 + ctx.reputation * 0.3),
+      id: this.nextId++, friend, u, lane: r() < 0.5 ? 0 : 1, speed: 0.1,
+      thirsty: ctx.open && r() < thirst, thirstAt: -0.35 + r() * 1.25,
+      maxPay: 1.0 * pay * (0.6 + r() * 0.9) * (1 + ctx.reputation * 0.3),
       bought: false, queuedAt: null, checked: new Set(), bubble: null, hop: r() * 6,
     });
+  }
+
+  /** Speech bubble, skipped if a neighbour is already talking (keeps the beach readable). */
+  private say(w: Walker, text: string, kind: "good" | "bad", t: number) {
+    if (this.walkers.some(o => o !== w && o.bubble && Math.abs(o.u - w.u) < 0.14)) return;
+    w.bubble = { text, kind, t };
   }
 
   step(dt: number, ctx: SimCtx): SimEvent[] {
@@ -118,13 +135,12 @@ export class Island {
       if (ctx.ledger.sell(price, rule.lemonsMul / CUPS_PER_LEMON)) {
         w.bought = true;
         s.sold += 1;
-        w.bubble = { text: this.rand() < 0.5 ? "YUM!" : `+${price.toFixed(2)}`, kind: "good", t: 1.4 };
         events.push({ type: "sale", stall: s, price, walker: w });
       } else {
-        w.bubble = { text: "SOLD OUT", kind: "bad", t: 1.4 };
+        this.say(w, "SOLD OUT", "bad", 1.4);
         s.flash = 1.5;
         events.push({ type: "soldout", stall: s, walker: w });
-        for (const q of s.queue) { q.queuedAt = null; q.bubble = { text: "AWW", kind: "bad", t: 1.2 }; }
+        for (const q of s.queue) { q.queuedAt = null; this.say(q, "AWW", "bad", 1.2); }
         s.queue = [];
       }
     }
@@ -136,14 +152,14 @@ export class Island {
       if (w.queuedAt) {
         // Shuffle up to your spot in the queue.
         const idx = w.queuedAt.queue.indexOf(w);
-        const target = w.queuedAt.u - 0.022 * (idx + 1);
+        const target = queueSpot(w.queuedAt, idx);
         w.u += Math.sign(target - w.u) * Math.min(Math.abs(target - w.u), dt * 0.05);
         keep.push(w);
         continue;
       }
       w.u += w.speed * dt;
       for (const s of this.stalls) {
-        if (w.checked.has(s) || w.u < s.u - 0.035 || w.u > s.u + 0.02) continue;
+        if (w.checked.has(s) || s.u < w.thirstAt || w.u < queueSpot(s, s.queue.length) - 0.01 || w.u > s.u + 0.02) continue;
         w.checked.add(s);
         if (!w.thirsty || w.bought || !ctx.open || !s.operator) continue;
         const rule = STALLS[s.kind];
@@ -151,13 +167,13 @@ export class Island {
         const mood = rule.weather[ctx.weather] ?? 1;
         const limit = w.maxPay * rule.priceMul * mood;
         if (!this.canServe(s, ctx.ledger)) {
-          w.bubble = { text: "SOLD OUT", kind: "bad", t: 1.3 };
+          this.say(w, "SOLD OUT", "bad", 1.3);
           s.flash = 1.5;
           events.push({ type: "soldout", stall: s, walker: w });
         } else if (price > limit) {
-          w.bubble = { text: price > limit * 1.5 ? "WAY $$$" : "TOO $$$", kind: "bad", t: 1.3 };
+          this.say(w, "TOO $$$", "bad", 1.2);
           events.push({ type: "pricey", stall: s, walker: w });
-        } else if (s.queue.length < 8) {
+        } else if (s.queue.length < QUEUE_MAX) {
           s.queue.push(w);
           w.queuedAt = s;
         }
@@ -172,12 +188,8 @@ export class Island {
   /** Opening time: the beach is already busy — re-roll thirst and send a crowd in from the ferry. */
   openUp(ctx: SimCtx) {
     const { thirst } = this.willingness(ctx);
-    for (const w of this.walkers) { w.thirsty = this.rand() < thirst; w.bought = false; w.checked.clear(); }
-    for (let i = 0; i < 7; i++) {
-      this.spawn(ctx);
-      const w = this.walkers[this.walkers.length - 1];
-      if (w) w.u = -0.05 + this.rand() * 0.3;
-    }
+    for (const w of this.walkers) { w.thirsty = this.rand() < thirst; w.thirstAt = w.u - 0.1 + this.rand() * 0.6; w.bought = false; w.checked.clear(); }
+    for (const u of [0.24, 0.14, 0.04]) this.spawn(ctx, u);
   }
 
   /** End of day: send everyone home and reset counters. */

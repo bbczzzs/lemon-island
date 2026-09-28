@@ -26,7 +26,7 @@ await testGame("./games/lemon", {
 
     // Price control.
     await game.getByRole("button", { name: "Raise price" }).click();
-    await game.getByText("0.45", { exact: true }).waitFor();
+    await game.getByText("0.90", { exact: true }).waitFor();
     await game.getByRole("button", { name: "Lower price" }).click();
 
     // Open the day, pause/resume via the runtime menu, then sell until evening.

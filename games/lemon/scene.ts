@@ -23,7 +23,6 @@ export interface SceneState {
 const K = "#000000", WHITE = "#ffffff";
 const MEADOW = "#B9D984", POND = "#7DB4DB", SUN = "#F2CE68", CORAL = "#ED927E", LILAC = "#B3A0D8", SIGNAL = "#CCFF00";
 const SEA_DEEP = "#4f86b0", SAND = "#f7dd8f";
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 
 const GLYPHS: Record<string, string> = {
   "0": "111101101101111", "1": "010110010010111", "2": "111001111100111", "3": "111001111001111",
@@ -46,9 +45,9 @@ function mulberry32(a: number): () => number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const abgr = (hex: string) => {
-  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
-  return (0xff << 24 | b << 16 | g << 8 | r) >>> 0;
+const mix = (a: string, b: string, t: number) => {
+  const p = (h: string, i: number) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
+  return "#" + [0, 1, 2].map(i => Math.round(p(a, i) + (p(b, i) - p(a, i)) * t).toString(16).padStart(2, "0")).join("");
 };
 
 /** 16x16 sprite on an 18x18 canvas with a 1px outline (Friends: black on white). */
@@ -74,7 +73,6 @@ export class LemonScene {
   private ctx: CanvasRenderingContext2D;
   private buf: HTMLCanvasElement;
   private b: CanvasRenderingContext2D;
-  private sky: ImageData | null = null;
   private W = 400;
   private H = 225;
   private scale = 3;
@@ -105,7 +103,6 @@ export class LemonScene {
     this.W = Math.ceil(cssW / this.scale);
     this.H = Math.ceil(cssH / this.scale);
     this.buf.width = this.W; this.buf.height = this.H;
-    this.sky = this.b.createImageData(this.W, this.H);
     this.canvas.width = Math.round(cssW * this.dpr);
     this.canvas.height = Math.round(cssH * this.dpr);
     const r = mulberry32(5);
@@ -187,51 +184,42 @@ export class LemonScene {
   }
 
   // ---- sky + sea ----
+  /** Flat colour bands (no dither noise): a calm sky and a calm sea. */
   private drawSkyAndSea(s: SceneState) {
-    const img = this.sky!;
-    const px = new Uint32Array(img.data.buffer);
-    const white = abgr(WHITE), hz = this.horizon;
-    let skyTop = POND, skyAmt = 0.3, sea = POND, seaAmt = 0.55;
-    if (s.weather === "hot") { skyTop = SUN; skyAmt = 0.45; }
-    if (s.weather === "cloudy") { skyTop = "#a9b0b8"; skyAmt = 0.4; seaAmt = 0.65; }
-    if (s.weather === "rain") { skyTop = "#6b7280"; skyAmt = 0.7; sea = SEA_DEEP; seaAmt = 0.8; }
-    if (s.weather === "festival") { skyTop = LILAC; skyAmt = 0.36; }
+    const g = this.b, W = this.W, H = this.H, hz = this.horizon;
+    let top = "#9cc9e8", mid = "#c4e0f2", low = "#e6f3fb", sea = POND, deep = SEA_DEEP;
+    if (s.weather === "hot") { top = "#f5d77e"; mid = "#f9e6a8"; low = "#fdf4d6"; }
+    if (s.weather === "cloudy") { top = "#b5bcc4"; mid = "#ccd2d8"; low = "#e3e6ea"; sea = "#8fb2cc"; }
+    if (s.weather === "rain") { top = "#7d8591"; mid = "#9aa1ab"; low = "#b8bec6"; sea = "#6f97b8"; deep = "#3f6d92"; }
+    if (s.weather === "festival") { top = "#c7b8e6"; mid = "#ddd2f0"; low = "#f1ecf9"; }
     const dusk = s.phase === "evening" ? 1 : s.phase === "open" ? Math.max(0, (s.dayT - 0.72) / 0.28) : 0;
-    const skyC = abgr(skyTop), seaC = abgr(sea), deepC = abgr(SEA_DEEP), duskC = abgr(CORAL), sunC = abgr(SUN), nightC = abgr("#3b2f63");
-    const wave = this.reduced ? 0 : this.time;
-    for (let y = 0; y < this.H; y++) {
-      const row = y * this.W, by = (y & 3) * 4;
-      if (y < hz) {
-        const f = 1 - y / hz;
-        const d = Math.min(1, skyAmt * f + 0.08) * 16;
-        const dd = dusk * (0.2 + (y / hz) * 0.7) * 16;
-        for (let x = 0; x < this.W; x++) {
-          const th = BAYER[by + (x & 3)];
-          let c = th < d ? skyC : white;
-          if (dusk > 0 && th < dd) c = y > hz * 0.7 ? sunC : duskC;
-          if (s.phase === "evening" && th < f * 11) c = nightC;
-          px[row + x] = c;
-        }
-      } else {
-        const depth = (y - hz) / (this.H - hz);
-        const d = Math.min(1, seaAmt + depth * 0.35) * 16;
-        for (let x = 0; x < this.W; x++) {
-          const th = BAYER[by + (x & 3)];
-          // Moving wave highlights.
-          const crest = Math.sin(x * 0.12 + y * 0.9 - wave * 1.6) + Math.sin(x * 0.05 - wave * 0.7);
-          let c = th < d ? (depth > 0.55 ? deepC : seaC) : white;
-          if (crest > 1.55 && (y % 3 === 0)) c = white;
-          if (dusk > 0 && Math.abs(x - this.W * 0.5) < 14 * (1 - depth * 0.5) && (y % 2 === 0) && th < dusk * 10) c = y % 4 === 0 ? sunC : duskC;
-          px[row + x] = c;
-        }
+    if (dusk > 0) { top = mix(top, "#3b2f63", dusk * 0.8); mid = mix(mid, CORAL, dusk * 0.7); low = mix(low, SUN, dusk * 0.8); }
+    const bands: [number, string][] = [[0, top], [0.45, mid], [0.78, low]];
+    for (let i = 0; i < bands.length; i++) {
+      const y0 = Math.round(hz * bands[i][0]), y1 = i + 1 < bands.length ? Math.round(hz * bands[i + 1][0]) : hz;
+      g.fillStyle = bands[i][1]; g.fillRect(0, y0, W, y1 - y0);
+    }
+    // Sea: two flat bands with a few slow wave dashes.
+    const deepY = hz + Math.round((H - hz) * 0.55);
+    g.fillStyle = sea; g.fillRect(0, hz, W, deepY - hz);
+    g.fillStyle = deep; g.fillRect(0, deepY, W, H - deepY);
+    const t = this.reduced ? 0 : this.time;
+    g.fillStyle = WHITE;
+    for (let row = 0, y = hz + 4; y < H; row++, y += 6) {
+      for (let k = 0; k < 6; k++) {
+        const x = Math.round(((k * 61 + row * 37 + t * (4 + (row % 3))) % (W + 20)) - 10);
+        g.fillRect(x, y, 5, 1);
       }
     }
-    this.b.putImageData(img, 0, 0);
-    this.b.fillStyle = "#111111"; this.b.fillRect(0, hz, this.W, 1);
+    if (dusk > 0) {
+      g.fillStyle = mix(sea, SUN, dusk * 0.8);
+      for (let y = hz + 2; y < hz + 14; y += 2) g.fillRect(Math.round(W / 2 - 12 + (y - hz)), y, Math.max(2, 24 - (y - hz) * 2), 1);
+    }
+    g.fillStyle = K; g.fillRect(0, hz, W, 1);
     if (s.phase === "evening") {
       const r = mulberry32(9);
-      this.b.fillStyle = WHITE;
-      for (let i = 0; i < 45; i++) { const x = Math.floor(r() * this.W), y = Math.floor(r() * hz * 0.8); if (Math.sin(this.time * 2 + i) > -0.3) this.b.fillRect(x, y, 1, 1); }
+      g.fillStyle = WHITE;
+      for (let i = 0; i < 24; i++) { const x = Math.floor(r() * W), y = Math.floor(r() * hz * 0.6); if (Math.sin(this.time * 2 + i) > -0.3) g.fillRect(x, y, 1, 1); }
     }
   }
 
@@ -246,11 +234,11 @@ export class LemonScene {
       return;
     }
     const t = s.phase === "morning" ? 0.1 : s.dayT;
-    const x = this.W * (0.1 + t * 0.8), y = this.horizon * (0.9 - Math.sin(t * Math.PI) * 0.6);
-    const r = s.weather === "hot" ? 13 : 10;
-    const n = 12, spin = this.reduced ? 0 : this.time * 0.4;
+    const x = this.W * (0.06 + t * 0.2), y = this.horizon * (0.62 - Math.sin(t * Math.PI) * 0.3);
+    const r = s.weather === "hot" ? 9 : 7;
+    const n = 8;
     for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + spin, len = (i % 2 ? 5 : 8) + (s.weather === "hot" ? 3 : 0);
+      const a = (i / n) * Math.PI * 2, len = s.weather === "hot" ? 4 : 3;
       for (let k = r + 3; k < r + 3 + len; k++) { g.fillStyle = K; g.fillRect(Math.round(x + Math.cos(a) * k), Math.round(y + Math.sin(a) * k), 2, 2); }
     }
     this.disc(x, y, r + 2, WHITE); this.disc(x, y, r + 1, K); this.disc(x, y, r, SUN);
@@ -269,10 +257,10 @@ export class LemonScene {
   private drawClouds(s: SceneState) {
     const fill = s.weather === "rain" ? "#d7dae0" : WHITE;
     const r = mulberry32(21);
-    for (let i = 0; i < 6; i++) {
-      const w = 26 + r() * 30, speed = 3 + r() * 4;
-      const x = ((r() * this.W + this.time * speed) % (this.W + 80)) - 40;
-      this.cloud(x, 12 + r() * this.horizon * 0.55, w, fill);
+    for (let i = 0; i < 3; i++) {
+      const w = 16 + r() * 12, speed = 2 + r() * 3;
+      const x = ((r() * this.W + this.time * speed) % (this.W + 60)) - 30;
+      this.cloud(x, 10 + r() * this.horizon * 0.35, w, fill);
     }
   }
 
@@ -477,22 +465,33 @@ export class LemonScene {
     }
     if (s.upgrades.has("sign") && st.operator && s.phase !== "evening") {
       const on = this.reduced || Math.floor(this.time * 3) % 4 !== 0;
-      this.sign(st.kind === "bar" ? "FIZZ" : st.kind === "cart" ? "POPS" : "LEMON", x, base - 50, on ? SIGNAL : WHITE);
+      this.sign(st.kind === "bar" ? "FIZZ" : st.kind === "cart" ? "POPS" : "LEMON", x, base - 61, on ? SIGNAL : WHITE);
     }
     const price = Math.round(s.price * (st.kind === "bar" ? 2 : st.kind === "cart" ? 1.4 : 1) * 100) / 100;
-    if (closed) this.sign("HIRE", x, base - 12, CORAL);
-    else if (st.flash > 0) this.sign("SOLD OUT", x, base - 12, CORAL);
-    else if (s.phase === "open") this.sign(price.toFixed(2), x - w / 2 + 3, base - 12, WHITE);
-    else if (s.phase === "morning") this.sign("SOON", x, base - 12, WHITE);
+    // One clear tag above the awning.
+    const tagY = base - 50;
+    if (closed) this.sign("NEEDS STAFF", x, tagY, CORAL);
+    else if (st.flash > 0) this.sign("SOLD OUT", x, tagY, CORAL);
+    else if (s.phase === "open") this.sign(`${price.toFixed(2)} RF`, x, tagY, SUN);
+    else if (s.phase === "morning") this.sign("OPENS SOON", x, tagY, WHITE);
+    else this.sign("CLOSED", x, tagY, WHITE);
   }
 
   private drawWalker(w: Walker) {
     const g = this.b;
     const f = this.frames(`f${w.friend.id}`, w.friend.frames);
-    const x = this.xAt(w.u), y = this.walkY - 15 + Math.round(w.lane * 4);
+    const x = this.xAt(w.u), y = this.walkY - 17 + Math.round(w.lane * 6);
     const bob = w.queuedAt ? 0 : Math.round(Math.abs(Math.sin(w.hop)) * -2);
     g.drawImage(f[Math.floor(w.hop / 2) % f.length], x - 9, y + bob);
-    if (w.bubble) this.sign(w.bubble.text, x, y - 11 + bob, w.bubble.kind === "bad" ? CORAL : SIGNAL);
+    if (w.bought) {
+      // A lemonade in hand: the clearest "they bought one" signal.
+      const cx = x + 7, cy = y + 7 + bob;
+      g.fillStyle = K; g.fillRect(cx - 1, cy - 1, 6, 8); g.fillRect(cx + 3, cy - 4, 1, 3);
+      g.fillStyle = WHITE; g.fillRect(cx, cy, 4, 6);
+      g.fillStyle = SUN; g.fillRect(cx, cy + 2, 4, 4);
+    }
+    // Bubbles hang to the walker's left (the side they came from) so they never cover the stall ahead.
+    if (w.bubble) this.sign(w.bubble.text, x + 9 - (w.bubble.text.length * 4 + 3) / 2, y - 11 + bob, w.bubble.kind === "bad" ? CORAL : SIGNAL);
   }
 
   private drawStallsAndCrowd(s: SceneState) {
