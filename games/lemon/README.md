@@ -11,9 +11,9 @@ Built with FriendSDK **v0.1.2** for the Rare Friends Vibeathon · Category: **Ec
 Each day is about 36 seconds:
 
 1. **Morning.** Check the weather forecast, buy lemons at the **market** (1 lemon = 2 cups) and set your **cup price**.
-2. **Open.** Real Rare Friends arrive by ferry and walk the boardwalk. Thirsty ones compare your price with what they'll pay today. Cheap enough means they queue, too expensive gets a "TOO $$$", and running out means "SOLD OUT".
+2. **Open.** Real Rare Friends arrive by ferry and walk the boardwalk. Thirsty ones compare your price with what they'll pay today. Cheap enough means they queue and walk off holding a lemonade, too expensive gets a "TOO $$$", and running out means "SOLD OUT". A mood meter and a one-line hint ("Too pricey! Friends pay ~0.90 today") tell you what to fix, and the button to press next blinks.
 3. **Evening.** A report card shows cups sold, sales, costs and profit. A quarter of leftover lemons rot overnight, so plan your stock.
-4. **Grow.** Reinvest in more **Lemon Stands**, an **Ice Pop Cart** (1.4× price, loves heatwaves), a **Juice Bar** (2× price, 2× lemons), **Umbrellas**, **Big Jugs**, a **Neon Sign**, a **Lemon Grove** (12 free lemons a day) and a **Tour Balloon** (+35% tourists).
+4. **Grow.** Reinvest in more **Lemon Stands** (Friends get thirsty at different points on the beach, so stands spread along it catch more of them), an **Ice Pop Cart** (1.4× price, loves heatwaves), a **Juice Bar** (2× price, 2× lemons), **Umbrellas**, **Big Jugs**, a **Neon Sign**, a **Lemon Grove** (12 free lemons a day) and a **Tour Balloon** (+35% tourists).
 5. **Hire Friends.** Every extra stall needs a real Friend to run it, paid daily wages.
 
 Weather changes everything: heatwaves pay more, rain empties the boardwalk (unless you have umbrellas), and every 7th day is a **Festival** with huge crowds.
