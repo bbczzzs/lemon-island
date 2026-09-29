@@ -15,6 +15,7 @@ Each day is about 36 seconds:
 3. **Evening.** A report card shows cups sold, sales, costs and profit. A quarter of leftover lemons rot overnight, so plan your stock.
 4. **Grow.** Reinvest in more **Lemon Stands** (Friends get thirsty at different points on the beach, so stands spread along it catch more of them), an **Ice Pop Cart** (1.4× price, loves heatwaves), a **Juice Bar** (2× price, 2× lemons), **Umbrellas**, **Big Jugs**, a **Neon Sign**, a **Lemon Grove** (12 free lemons a day) and a **Tour Balloon** (+35% tourists).
 5. **Hire Friends.** Every extra stall needs a real Friend to run it, paid daily wages.
+6. **Events and goals.** About half the days bring an island event that asks for a decision: a **cruise ship** (bigger crowd, tourists in sun hats pay 30% more), a **lemon shortage** (+40% lemon price), a **rival stand** (Friends pay 15% less: price war), or a **food critic** (end the day HAPPY for +10% reputation). **8 island goals** (Lunch rush, Tourist trap, Juice empire…) each pay +5% reputation, never RF.
 
 Weather changes everything: heatwaves pay more, rain empties the boardwalk (unless you have umbrellas), and every 7th day is a **Festival** with huge crowds.
 
@@ -38,14 +39,15 @@ All RF is **simulated demo RF** (100 to start) and labelled as such. RF never ap
 - **Sinks that scale with success.** Bigger empires buy more lemons, build more and hire more, so they burn more.
 - **An island value leaderboard** against rival tycoons.
 - **A 30-day forecast in the Economy sheet**, played headlessly with the game's own crowd, market and ledger code (`forecast.ts`).
+- **Live $RAREFRIENDS link:** the Economy sheet reads the real RF `totalSupply()` from Robinhood chain (read-only, on demand, `chain.ts`) and shows what 100 / 1K / 10K steady players would burn a month and as a share of the live supply a year.
 
-**Proven in simulation** ([ECONOMY.md](../../ECONOMY.md), `npm run economy`, 4 strategies × 25 seeds): a steady player burns ~518 RF and pays ~648 RF to other Friends in 30 days; pricing 40% too high sells 60% fewer cups; builders overtake savers around day 36 and end day 60 2.2× richer; no sensible run goes broke.
+**Proven in simulation** ([ECONOMY.md](../../ECONOMY.md), `npm run economy`, 4 strategies × 25 seeds): a steady player burns ~591 RF and pays ~723 RF to other Friends in 30 days; pricing 40% too high sells 60% fewer cups; builders overtake savers around day 36 and end day 60 2.2× richer; no sensible run goes broke.
 
 ## Rare Friends integration
 
 - **Your verified Friend owns the island** and runs the first stand. The SDK handles the wallet, Friend selection and the ownership gate, and the sprite is read with `createFriendReader()`.
 - **The crowd, farmers and helpers are real Generations Friends**, their canonical on-chain sprites baked into `friends.json`. Friends stay canonical black and white.
-- The look follows the FriendSDK style (paper, ink, `GAME_PALETTE`, square corners, hard shadows), set on a beach island with a ferry dock, lighthouse, palms and a sunset over the sea.
+- The look follows the FriendSDK style (paper, ink, `GAME_PALETTE`, square corners, hard shadows), set on a beach island with a ferry dock, lighthouse, palms and a sunset over the sea. Tourists wear straw hats sitting on their own sprite's head; goals and good days end in fireworks over the sea.
 
 ## Run it
 
@@ -58,7 +60,7 @@ Controls: **Space** opens the day or starts the next one · **[ ]** change price
 ## Checks
 
 - `npm run typecheck`: strict TypeScript, 0 errors.
-- `node test-interaction.mjs 960` and `390`: in the real sandboxed runtime with the SDK's mock wallet. Covers buying lemons (balance falls by the quoted cost), changing the price, opening the day, cups selling, the evening report, building a stall, hiring a Friend to run it, the Economy sheet and the next morning.
+- `node test-interaction.mjs 960` and `390`: in the real sandboxed runtime with the SDK's mock wallet. Covers buying lemons (balance falls by the quoted cost), changing the price, opening the day, cups selling, the evening report, building a stall, hiring a Friend to run it, the Economy sheet, the goals (first sale earns a trophy) and the next morning.
 - `npx friendsdk check games/lemon` and `npx friendsdk test` at 1200 px and 360 px.
 - `npm run economy`: 30-day headless simulation of four strategies × 25 seeds, written to `ECONOMY.md`.
 

@@ -68,6 +68,7 @@ export function spriteCanvas(rows: SpriteRows, fill = K, outline = WHITE): HTMLC
 interface Coin { x: number; y: number; vy: number; t: number; }
 interface Drop { x: number; y: number; s: number; }
 interface Confetti { x: number; y: number; vx: number; vy: number; c: string; t: number; }
+interface Spark { x: number; y: number; vx: number; vy: number; c: string; t: number; life: number; rocket?: boolean; ty?: number; }
 
 export class LemonScene {
   private ctx: CanvasRenderingContext2D;
@@ -84,6 +85,9 @@ export class LemonScene {
   private coins: Coin[] = [];
   private drops: Drop[] = [];
   private confetti: Confetti[] = [];
+  private sparks: Spark[] = [];
+  private showT = 0;
+  private rush = new Map<Stall, { times: number[]; until: number }>();
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d")!;
@@ -123,9 +127,63 @@ export class LemonScene {
 
   /** A coin pops out of a stall when a cup sells. */
   sale(stall: Stall) {
+    // Four cups in three seconds at one stall flashes a "RUSH!" sign.
+    const r = this.rush.get(stall) ?? { times: [], until: 0 };
+    r.times = r.times.filter(t => this.time - t < 3);
+    r.times.push(this.time);
+    if (r.times.length >= 4) { r.until = this.time + 1.8; r.times = []; }
+    this.rush.set(stall, r);
     if (this.reduced) return;
     const x = this.xAt(stall.u);
     for (let i = 0; i < 3; i++) this.coins.push({ x: x + (Math.random() - 0.5) * 10, y: this.walkY - 30, vy: -26 - Math.random() * 20, t: 0 });
+  }
+
+  /** Fireworks over the sea plus a confetti burst: a goal met, a good day. */
+  celebrate(bursts = 3) {
+    if (this.reduced) return;
+    for (let i = 0; i < bursts; i++) this.launch(i * 0.35);
+    const cols = [CORAL, SUN, LILAC, SIGNAL, POND];
+    for (let i = 0; i < 36; i++) this.confetti.push({ x: Math.random() * this.W, y: -Math.random() * 30, vx: (Math.random() - 0.5) * 30, vy: 25 + Math.random() * 30, c: cols[i % 5], t: 0 });
+  }
+
+  private launch(delay = 0) {
+    this.sparks.push({
+      x: this.W * (0.18 + Math.random() * 0.64), y: this.horizon + 4, vx: (Math.random() - 0.5) * 10, vy: -(75 + Math.random() * 25),
+      c: SUN, t: -delay, life: 1, rocket: true, ty: this.horizon * (0.22 + Math.random() * 0.35),
+    });
+  }
+
+  private drawFireworks(dt: number, s: SceneState) {
+    if (this.reduced) { this.sparks = []; return; }
+    if (s.weather === "festival" && s.phase === "evening") {
+      this.showT -= dt;
+      if (this.showT <= 0) { this.launch(); this.showT = 0.6 + Math.random() * 0.7; }
+    }
+    const g = this.b, cols = [CORAL, SUN, LILAC, SIGNAL, POND, WHITE];
+    const next: Spark[] = [];
+    for (const p of this.sparks) {
+      p.t += dt;
+      if (p.t < 0) { next.push(p); continue; }
+      if (p.rocket) {
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        g.fillStyle = SUN; g.fillRect(Math.round(p.x), Math.round(p.y), 1, 2);
+        g.fillStyle = WHITE; g.fillRect(Math.round(p.x), Math.round(p.y + 3), 1, 1);
+        if (p.y > (p.ty ?? 20)) { next.push(p); continue; }
+        const c1 = cols[Math.floor(Math.random() * cols.length)], c2 = cols[Math.floor(Math.random() * cols.length)];
+        for (let i = 0, n = 22; i < n; i++) {
+          const a = (i / n) * Math.PI * 2, sp = 26 + Math.random() * 14;
+          next.push({ x: p.x, y: p.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, c: i % 3 ? c1 : c2, t: 0, life: 1 + Math.random() * 0.4 });
+        }
+        continue;
+      }
+      p.vy += 22 * dt; p.vx *= 1 - dt * 1.4; p.vy *= 1 - dt * 1.1;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.t >= p.life) continue;
+      const fade = p.t / p.life;
+      if (fade < 0.8 || Math.floor(p.t * 20) % 2) { g.fillStyle = p.c; g.fillRect(Math.round(p.x), Math.round(p.y), fade < 0.45 ? 2 : 1, fade < 0.45 ? 2 : 1); }
+      next.push(p);
+    }
+    this.sparks = next;
   }
 
   frame(s: SceneState, dt: number) {
@@ -136,12 +194,13 @@ export class LemonScene {
     this.drawHorizon(s);
     if (s.weather === "cloudy" || s.weather === "rain") this.drawClouds(s);
     if (s.upgrades.has("balloon")) this.drawBalloon();
+    this.drawFireworks(dt, s);
     this.drawBeach(s);
     this.drawStallsAndCrowd(s);
     this.drawForeground(s);
     this.stepCoins(dt);
     if (s.weather === "rain") this.drawRain(dt);
-    if (s.weather === "festival") this.drawConfetti(dt, s.phase !== "morning");
+    this.drawConfetti(dt, s.weather === "festival" && s.phase !== "morning");
     const c = this.ctx;
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.imageSmoothingEnabled = false;
@@ -472,9 +531,27 @@ export class LemonScene {
     const tagY = base - 50;
     if (closed) this.sign("NEEDS STAFF", x, tagY, CORAL);
     else if (st.flash > 0) this.sign("SOLD OUT", x, tagY, CORAL);
-    else if (s.phase === "open") this.sign(`${price.toFixed(2)} RF`, x, tagY, SUN);
+    else if (s.phase === "open") {
+      this.sign(`${price.toFixed(2)} RF`, x, tagY, SUN);
+      const rr = this.rush.get(st);
+      if (rr && this.time < rr.until && (this.reduced || Math.floor(this.time * 6) % 2 === 0)) this.sign("RUSH!", x + w / 2 + 12, tagY - 7, SIGNAL);
+    }
     else if (s.phase === "morning") this.sign("OPENS SOON", x, tagY, WHITE);
     else this.sign("CLOSED", x, tagY, WHITE);
+  }
+
+  private heads = new Map<number, { top: number; cx: number }>();
+  /** Top row and centre column of a Friend's sprite, for hats. */
+  private head(id: number, rows: SpriteRows) {
+    let h = this.heads.get(id);
+    if (!h) {
+      const top = Math.max(0, rows.findIndex(r => r.includes("#")));
+      const row = rows[top] ?? "";
+      const first = row.indexOf("#"), last = row.lastIndexOf("#");
+      h = { top, cx: first < 0 ? 8 : Math.round((first + last) / 2) };
+      this.heads.set(id, h);
+    }
+    return h;
   }
 
   private drawWalker(w: Walker) {
@@ -483,6 +560,14 @@ export class LemonScene {
     const x = this.xAt(w.u), y = this.walkY - 17 + Math.round(w.lane * 6);
     const bob = w.queuedAt ? 0 : Math.round(Math.abs(Math.sin(w.hop)) * -2);
     g.drawImage(f[Math.floor(w.hop / 2) % f.length], x - 9, y + bob);
+    if (w.tourist) {
+      // A straw sun hat sitting on this Friend's own head: tourists pay more. (The Friend stays canonical.)
+      const hd = this.head(w.friend.id, w.friend.frames[0]);
+      const hx = x - 8 + hd.cx, hy = y + bob + hd.top;
+      g.fillStyle = K; g.fillRect(hx - 6, hy - 1, 12, 3); g.fillRect(hx - 4, hy - 5, 8, 5);
+      g.fillStyle = SUN; g.fillRect(hx - 5, hy, 10, 1); g.fillRect(hx - 3, hy - 4, 6, 4);
+      g.fillStyle = CORAL; g.fillRect(hx - 3, hy - 2, 6, 1);
+    }
     if (w.bought) {
       // A lemonade in hand: the clearest "they bought one" signal.
       const cx = x + 7, cy = y + 7 + bob;
@@ -491,7 +576,7 @@ export class LemonScene {
       g.fillStyle = SUN; g.fillRect(cx, cy + 2, 4, 4);
     }
     // Bubbles hang to the walker's left (the side they came from) so they never cover the stall ahead.
-    if (w.bubble) this.sign(w.bubble.text, x + 9 - (w.bubble.text.length * 4 + 3) / 2, y - 11 + bob, w.bubble.kind === "bad" ? CORAL : SIGNAL);
+    if (w.bubble) this.sign(w.bubble.text, x + 9 - (w.bubble.text.length * 4 + 3) / 2, y - (w.tourist ? 15 : 11) + bob, w.bubble.kind === "bad" ? CORAL : SIGNAL);
   }
 
   private drawStallsAndCrowd(s: SceneState) {

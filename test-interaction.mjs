@@ -1,6 +1,6 @@
 // Interaction test for Lemon Island in the SDK's automated harness (mock
 // wallet + sample Friend #7730): buy lemons, set a price, run a day, read the
-// report, build a stall, hire a Friend, check the economy and the next morning.
+// report, build a stall, hire a Friend, check the economy and goals, and the next morning.
 //   node test-interaction.mjs [width]
 import { testGame } from "@rarefriends/friendsdk/testing";
 
@@ -53,11 +53,17 @@ await testGame("./games/lemon", {
     await game.getByText("Richest islands").waitFor();
     await game.getByRole("button", { name: "Close" }).click();
 
+    // Goals: the first sale earned "Grand opening".
+    await game.getByRole("button", { name: /Island goals, [1-9]/ }).click();
+    await game.getByText("Grand opening").waitFor();
+    await game.getByText("Juice empire").waitFor();
+    await game.getByRole("button", { name: "Close" }).click();
+
     // Next morning.
     await game.getByRole("button", { name: /NEXT DAY/ }).click();
-    await game.getByText("DAY 2").waitFor({ timeout: 3000 });
+    await game.getByText("DAY 2", { exact: true }).waitFor({ timeout: 3000 });
     await game.getByRole("button", { name: "Sound on" }).click();
   },
 });
 
-console.log(`INTERACTION PASS at ${width}px: lemons, price, a full day, report, build, hire, economy, next day`);
+console.log(`INTERACTION PASS at ${width}px: lemons, price, a full day, report, build, hire, economy, goals, next day`);

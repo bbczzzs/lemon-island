@@ -13,10 +13,14 @@ import { LemonScene, spriteCanvas, type Phase } from "./scene";
 import { LemonAudio } from "./audio";
 import { loadPilot, type PilotSprite } from "./pilot";
 import { Px, WEATHER_ICON, type IconName } from "./icons";
-import { simulateIsland, type DayStat } from "./forecast";
+import { simulateAverage, type DayStat } from "./forecast";
+import { EVENTS, rollEvent, eventPayFactor, criticVerdict, type EventId } from "./events";
+import { GOALS, GOAL_REPUTATION, goalDone, type GoalCtx } from "./goals";
+import { readRfSupply } from "./chain";
 import "./style.css";
 
-type Sheet = "lemons" | "build" | "staff" | "economy";
+type Sheet = "lemons" | "build" | "staff" | "economy" | "goals";
+const EVENT_ICON: Record<EventId, IconName> = { cruise: "ship", shortage: "lemon", rival: "stand", critic: "star" };
 interface Report { day: number; cups: number; sales: bigint; used: number; rot: number; builds: bigint; wages: bigint; spoiled: number; profit: number; rep: number; stock: number; }
 interface Rival { friend: RosterFriend; value: number; }
 interface Toast { id: number; text: string; kind: "good" | "bad" | "info"; }
@@ -66,7 +70,7 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
   const game = useRef({
     day: 1, phase: "morning" as Phase, t: 0, weather: "sunny" as Weather, forecast: "sunny" as Weather,
     price: 0.8, market: BASE_LEMON, boughtToday: 0, reputation: 0.2, marketHistory: [BASE_LEMON] as number[],
-    grove: 0, mood: 0.5,
+    grove: 0, mood: 0.5, event: null as EventId | null, touristsServed: 0,
   });
   const rivalsRef = useRef<Rival[]>([]);
   const toastId = useRef(0);
@@ -85,7 +89,20 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
   const [pops, setPops] = useState<{ id: number; v: number }[]>([]);
   const popId = useRef(0);
   const forecastRef = useRef<DayStat[] | null>(null);
+  const goalsRef = useRef<Set<string>>(new Set());
+  const [showEvent, setShowEvent] = useState(false);
+  const [players, setPlayers] = useState(1000);
+  const [rfSupply, setRfSupply] = useState<bigint | null>(null);
+  const [supplyState, setSupplyState] = useState<"idle" | "loading" | "failed">("idle");
   const rerender = () => setTick(t => (t + 1) % 1_000_000);
+
+  /** On demand only: one read-only totalSupply() call on Robinhood mainnet. */
+  function loadSupply() {
+    setSupplyState("loading");
+    readRfSupply().then(v => {
+      if (v) { setRfSupply(v); setSupplyState("idle"); } else setSupplyState("failed");
+    });
+  }
 
   function toast(text: string, kind: Toast["kind"] = "info") {
     const id = ++toastId.current;
@@ -98,6 +115,24 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
     const id = ++popId.current;
     setPops(p => [...p.slice(-2), { id, v }]);
     window.setTimeout(() => setPops(p => p.filter(x => x.id !== id)), 850);
+  }
+
+  /** Checks the island goals; each newly met one pays +5% reputation (never RF). */
+  function checkGoals(end?: { dayProfit: number; happyEnd: boolean }) {
+    const g = game.current;
+    const ledger = ledgerRef.current;
+    const ctx: GoalCtx = {
+      totalCups: ledger.total.cups, todayCups: ledger.today.cups, dayProfit: end?.dayProfit ?? null, happyEnd: end?.happyEnd ?? false,
+      stalls: islandRef.current.stalls.length, helpers: helpersRef.current.length, burned: toRf(ledger.total.burned), touristsServed: g.touristsServed,
+    };
+    for (const goal of GOALS) {
+      if (goalsRef.current.has(goal.id) || !goalDone(goal, ctx)) continue;
+      goalsRef.current.add(goal.id);
+      g.reputation = Math.min(1, g.reputation + GOAL_REPUTATION);
+      toast(`Goal complete: ${goal.name} · +5% reputation`, "good");
+      audioRef.current?.milestone();
+      sceneRef.current?.celebrate(3);
+    }
   }
 
   function pickCandidates() {
@@ -202,15 +237,23 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
   function step(dt: number) {
     const g = game.current;
     const ledger = ledgerRef.current;
-    const events = islandRef.current.step(dt, { open: g.phase === "open", weather: g.weather, price: g.price, upgrades: upgradesRef.current, reputation: g.reputation, ledger });
+    const ev = g.event ? EVENTS[g.event] : null;
+    const events = islandRef.current.step(dt, { open: g.phase === "open", weather: g.weather, price: g.price, upgrades: upgradesRef.current, reputation: g.reputation, ledger, crowd: ev?.crowd, payMul: ev?.pay, tourists: ev?.tourists });
+    let sold = false;
     for (const e of events) {
-      if (e.type === "sale") { g.reputation = Math.min(1, g.reputation + 0.003); g.mood = Math.min(1, g.mood + 0.1); sceneRef.current?.sale(e.stall); audioRef.current?.coin(); addPop(e.price); }
+      if (e.type === "sale") {
+        sold = true;
+        if (e.walker.tourist) g.touristsServed += 1;
+        g.reputation = Math.min(1, g.reputation + 0.003); g.mood = Math.min(1, g.mood + 0.1);
+        sceneRef.current?.sale(e.stall); audioRef.current?.coin(); addPop(e.price);
+      }
       else if (e.type === "pricey") {
         g.reputation = Math.max(0, g.reputation - 0.0015);
         g.mood = Math.max(0, g.mood - 0.12);
       }
       else g.reputation = Math.max(0, g.reputation - 0.003);
     }
+    if (sold) checkGoals();
     if (g.phase === "open") {
       g.t += dt;
       if (g.t >= DAY_SECONDS) endDay();
@@ -219,19 +262,21 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
 
   function typicalToday(): number {
     const g = game.current;
-    return typicalPay(g.weather, upgradesRef.current.has("umbrella"), g.reputation);
+    return typicalPay(g.weather, upgradesRef.current.has("umbrella"), g.reputation) * eventPayFactor(g.event);
   }
 
   function openDay() {
     const g = game.current;
     if (g.phase !== "morning") return;
     setShowIntro(false);
+    setShowEvent(false);
     setSheet(null);
     if (ledgerRef.current.lemons < 0.25) toast("No lemons! Buy some at the market first.", "bad");
     g.phase = "open";
     g.t = 0;
     g.mood = 0.5;
-    islandRef.current.openUp({ open: true, weather: g.weather, price: g.price, upgrades: upgradesRef.current, reputation: g.reputation, ledger: ledgerRef.current });
+    const ev = g.event ? EVENTS[g.event] : null;
+    islandRef.current.openUp({ open: true, weather: g.weather, price: g.price, upgrades: upgradesRef.current, reputation: g.reputation, ledger: ledgerRef.current, crowd: ev?.crowd, payMul: ev?.pay, tourists: ev?.tourists });
     audioRef.current?.unlock();
     audioRef.current?.launchRumble();
     rerender();
@@ -248,6 +293,14 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
     const spoiled = ledger.spoil();
     const t = ledger.today;
     const profit = toRf(t.sales) - t.usedCost - t.rotCost - toRf(t.builds) - toRf(t.wages);
+    if (g.event === "critic") {
+      const d = criticVerdict(g.mood);
+      g.reputation = Math.min(1, Math.max(0, g.reputation + d));
+      toast(d > 0 ? "The critic loved it! +10% reputation" : "The critic was not impressed. −5% reputation", d > 0 ? "good" : "bad");
+    }
+    checkGoals({ dayProfit: profit, happyEnd: g.mood > 0.6 });
+    // A good day ends with fireworks over the sea.
+    if (profit > 0) sceneRef.current?.celebrate(profit >= 15 ? 3 : 1);
     setReport({ day: g.day, cups: t.cups, sales: t.sales, used: t.usedCost, rot: t.rotCost, builds: t.builds, wages: t.wages, spoiled, profit, rep: g.reputation, stock: Math.floor(ledger.lemons) });
     // Market and rivals move overnight.
     const rivalBought = 40 + Math.round(randRef.current() * 45) + (g.weather === "hot" ? 25 : 0);
@@ -265,6 +318,11 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
     g.phase = "morning";
     g.weather = g.forecast;
     g.forecast = rollWeather(randRef.current, g.day + 1);
+    g.event = rollEvent(randRef.current, g.day, g.weather);
+    if (g.event) {
+      g.market = Math.min(1.6, Math.round(g.market * EVENTS[g.event].lemonShock * 1000) / 1000);
+      setShowEvent(true);
+    }
     g.boughtToday = 0;
     ledgerRef.current.newDay();
     if (upgradesRef.current.has("farm")) { ledgerRef.current.lemons += 12; toast("Your grove grew 12 free lemons", "good"); }
@@ -319,6 +377,7 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
       upgradesRef.current.add(id);
       toast(`${b.name} built · ${fmtRf(b.cost / 2)} RF burned`, "good");
     }
+    checkGoals();
     audioRef.current?.unlock();
     audioRef.current?.burn();
     rerender();
@@ -331,6 +390,7 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
     setCandidates(c => c.filter(x => x.id !== f.id));
     audioRef.current?.unlock();
     audioRef.current?.tick(760);
+    window.setTimeout(() => checkGoals(), 0);
     toast(closed ? `#${f.id} now runs your ${closed.kind === "bar" ? "Juice Bar" : closed.kind === "cart" ? "Ice Pop Cart" : "stand"}` : `#${f.id} hired · build a stall for them`, "good");
     rerender();
   }
@@ -382,8 +442,8 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
   const hMax = Math.max(...hist, 0.8), hMin = Math.min(...hist, 0.3);
   const sparkY = (v: number) => 31 - ((v - hMin) / Math.max(0.01, hMax - hMin)) * 28;
   const t = ledger.total;
-  // Simulated once, on first open: 30 days of a steady player with the game's own crowd, market and ledger.
-  if (sheet === "economy" && !forecastRef.current) forecastRef.current = simulateIsland(ROSTER, 30, 11);
+  // Simulated once, on first open: 30 days of a steady player (mean of 5 runs) with the game's own crowd, market, ledger and events.
+  if (sheet === "economy" && !forecastRef.current) forecastRef.current = simulateAverage(ROSTER, 30, 5);
   const fcDays = forecastRef.current;
   const fcLast = fcDays?.[fcDays.length - 1];
 
@@ -393,6 +453,7 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
     build: { title: "Build your empire", icon: "stand" },
     staff: { title: "Hire Friends", icon: "people" },
     economy: { title: "Island economy", icon: "chart" },
+    goals: { title: "Island goals", icon: "trophy" },
   };
   const cls = (...parts: (string | false)[]) => parts.filter(Boolean).join(" ");
 
@@ -403,9 +464,10 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
       <header className="li-hud">
         <div className="li-hud-l">
           <div className="li-pill li-brandpill"><Px name="lemon" size={20} /><strong>LEMON ISLAND</strong><span className="li-demo">DEMO RF</span></div>
-          <div className="li-pill li-daypill"><b>DAY {g.day}</b><Px name={WEATHER_ICON[g.weather]} size={18} /><span>{w.label}</span><span ref={clockRef} className="li-clock">9:00</span></div>
+          <div className="li-pill li-daypill"><b>DAY {g.day}</b><Px name={WEATHER_ICON[g.weather]} size={18} /><span>{w.label}</span>{g.event && <span className="li-evchip"><Px name={EVENT_ICON[g.event]} size={14} />{EVENTS[g.event].title.replace("!", "")}</span>}<span ref={clockRef} className="li-clock">9:00</span></div>
         </div>
         <div className="li-hud-r">
+          <button type="button" className={`li-pill li-trophypill${sheet === "goals" ? " on" : ""}`} onClick={() => toggle("goals")} aria-label={`Island goals, ${goalsRef.current.size} of ${GOALS.length} done`}><Px name="trophy" size={18} /><strong>{goalsRef.current.size}/{GOALS.length}</strong></button>
           <div className="li-pill li-burnpill" title="RF your island burned this session (simulated)"><Px name="flame" size={18} /><strong>{fmtRf(t.burned)}</strong><span>burned</span></div>
           <div className="li-pill li-moneypill" title="Your demo RF balance">
             <Px name="coin" size={20} /><strong>{fmtRf(ledger.balance)}</strong><span>RF</span>
@@ -427,6 +489,15 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
       )}
 
       <div className="li-toasts" aria-live="polite">{toasts.map(x => <div key={x.id} className={`li-toast li-toast-${x.kind}`}>{x.text}</div>)}</div>
+
+      {showEvent && g.event && g.phase === "morning" && !sheet && !showIntro && (
+        <div className="li-card li-eventcard" role="dialog" aria-label={EVENTS[g.event].title}>
+          <div className="li-card-bar"><Px name={EVENT_ICON[g.event]} size={22} /><strong>{EVENTS[g.event].title}</strong><span className="li-fc">Today's event</span></div>
+          <p className="li-lead">{EVENTS[g.event].blurb}</p>
+          <p className="li-evtip"><b>Your move:</b> {EVENTS[g.event].tip}</p>
+          <button type="button" className="li-cta" onClick={() => setShowEvent(false)}>Got it <Px name="play" size={14} /></button>
+        </div>
+      )}
 
       {showIntro && g.phase === "morning" && !sheet && (
         <div className="li-card li-intro" role="dialog" aria-label="How to play">
@@ -541,8 +612,34 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
               </div>
             </div>
           )}
+          {sheet === "goals" && (
+            <div className="li-sheet-body">
+              <ul className="li-goals">
+                {GOALS.map(goal => {
+                  const done = goalsRef.current.has(goal.id);
+                  const [cur, target] = goal.progress({
+                    totalCups: ledger.total.cups, todayCups: ledger.today.cups, dayProfit: report?.profit ?? null, happyEnd: false,
+                    stalls: island.stalls.length, helpers: helpersRef.current.length, burned: toRf(ledger.total.burned), touristsServed: g.touristsServed,
+                  });
+                  return (
+                    <li key={goal.id} className={done ? "done" : ""}>
+                      <span className="li-goal-ic"><Px name={done ? "trophy" : goal.icon} size={26} /></span>
+                      <div>
+                        <strong>{goal.name}</strong>
+                        <span>{goal.text}</span>
+                        {!done && target > 1 && <i className="li-goalbar"><b style={{ width: `${(cur / target) * 100}%` }} /></i>}
+                      </div>
+                      <em>{done ? "✓ +5%" : target > 1 ? `${cur}/${target}` : "—"}</em>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="li-note">Every goal pays <b>+5% reputation</b>: more walkers stop and they pay a little more. Goals never create RF.</p>
+            </div>
+          )}
           {sheet === "economy" && (
             <div className="li-sheet-body li-econ">
+              <div className="li-econ-l">
               <div className="li-flow">
                 <div className="in"><span>Customers paid you</span><strong>+{fmtRf(t.sales)}</strong></div>
                 <div><span>Lemons → burned <Px name="flame" size={12} /></span><strong>{fmtRf(t.lemons / 2n)}</strong></div>
@@ -552,9 +649,30 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
                 <div><span>Wages → helper wallets</span><strong>{fmtRf(t.wages)}</strong></div>
                 <div className="tot"><span>Total burned</span><strong><Px name="flame" size={14} />{fmtRf(t.burned)} RF</strong></div>
               </div>
+              {fcLast && (
+                <div className="li-scale">
+                  <h4>At scale · paired with $RAREFRIENDS</h4>
+                  <div className="li-seg" role="group" aria-label="Number of players">
+                    {[100, 1000, 10000].map(n => (
+                      <button key={n} type="button" aria-pressed={players === n} onClick={() => setPlayers(n)}>{n >= 1000 ? `${n / 1000}K` : n} players</button>
+                    ))}
+                  </div>
+                  <p>
+                    Steady tycoons burn <b>{fmtRf(Math.round(fcLast.burned * players))} RF</b> and pay <b>{fmtRf(Math.round(fcLast.toFriends * players))} RF</b> to other Friends a month
+                    {rfSupply ? <>: <b>{((fcLast.burned * players * 12) / toRf(rfSupply) * 100).toPrecision(2)}%</b> of the live supply burned a year.</> : "."}
+                  </p>
+                  <button type="button" className="li-chain" onClick={loadSupply} disabled={supplyState === "loading"}>
+                    {supplyState === "loading" ? "Reading Robinhood chain…"
+                      : rfSupply ? <>Live $RAREFRIENDS supply <b>{fmtRf(rfSupply, 0)}</b> ↻</>
+                      : supplyState === "failed" ? "Chain read unavailable · retry ↻"
+                      : "Read the live RF supply from Robinhood chain ↻"}
+                  </button>
+                </div>
+              )}
+              </div>
               {fcDays && fcLast && (
                 <div className="li-forecast">
-                  <h4>30-day forecast · simulated with this game's own code</h4>
+                  <h4>30-day forecast · mean of 5 runs of this game's own code</h4>
                   <ForecastChart days={fcDays} />
                   <p className="li-fc-legend"><i className="burn" />burned <i className="friends" />paid to Friends <i className="bal" />balance</p>
                   <div className="li-fc-stats">
@@ -562,7 +680,6 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
                     <div><Px name="people" size={16} /><b>{fmtRf(Math.round(fcLast.toFriends))}</b><span>RF to Friends</span></div>
                     <div><Px name="stand" size={16} /><b>{fcLast.stalls}</b><span>stalls</span></div>
                   </div>
-                  <p className="li-fc-scale">A steady tycoon for 30 days. × 1,000 players ≈ <b>{fmtRf(Math.round(fcLast.burned * 1000))} RF</b> burned a month.</p>
                 </div>
               )}
               <div className="li-board-strip">

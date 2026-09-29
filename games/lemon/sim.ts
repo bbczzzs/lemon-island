@@ -6,6 +6,7 @@
  */
 import { STALLS, WEATHER, CUPS_PER_LEMON, type BuildId, type Weather, type Ledger } from "./economy";
 import type { RosterFriend } from "./friends";
+import { BASE_TOURISTS, TOURIST_PAY } from "./events";
 
 export type StallKind = "stand" | "cart" | "bar";
 
@@ -26,6 +27,7 @@ export interface Walker {
   lane: number; // 0..1 depth offset on the path
   speed: number;
   thirsty: boolean;
+  tourist: boolean; // sun hat, pays TOURIST_PAY× more
   thirstAt: number; // where on the beach they start looking for a drink (more stalls = more reach)
   maxPay: number;
   bought: boolean;
@@ -56,6 +58,9 @@ export interface SimCtx {
   upgrades: Set<BuildId>;
   reputation: number; // 0..1
   ledger: Ledger;
+  crowd?: number; // event walker multiplier (default 1)
+  payMul?: number; // event willingness-to-pay multiplier (default 1)
+  tourists?: number; // share of tourists among new walkers (default BASE_TOURISTS)
 }
 
 export class Island {
@@ -83,7 +88,7 @@ export class Island {
   walkersPerSecond(ctx: SimCtx): number {
     if (!ctx.open) return 0.35;
     const w = WEATHER[ctx.weather];
-    return 2.0 * w.walkers * (1 + ctx.reputation * 0.5) * (ctx.upgrades.has("balloon") ? 1.35 : 1);
+    return 2.0 * w.walkers * (ctx.crowd ?? 1) * (1 + ctx.reputation * 0.5) * (ctx.upgrades.has("balloon") ? 1.35 : 1);
   }
 
   willingness(ctx: SimCtx): { thirst: number; pay: number } {
@@ -96,16 +101,18 @@ export class Island {
 
   /** Adds a walker at `u` (default: off-screen at the ferry). */
   private spawn(ctx: SimCtx, u = -0.08) {
-    if (this.walkers.length >= MAX_WALKERS) return;
+    // Busy event days get a slightly bigger (still tidy) crowd.
+    if (this.walkers.length >= Math.round(MAX_WALKERS * Math.min(1.3, ctx.crowd ?? 1))) return;
     // Keep gaps so the crowd walks in a tidy, readable line.
     if (this.walkers.some(w => !w.queuedAt && Math.abs(w.u - u) < 0.05)) return;
     const r = this.rand;
     const { thirst, pay } = this.willingness(ctx);
     const friend = this.roster[Math.floor(r() * this.roster.length)];
+    const tourist = r() < (ctx.tourists ?? BASE_TOURISTS);
     this.walkers.push({
       id: this.nextId++, friend, u, lane: r() < 0.5 ? 0 : 1, speed: 0.1,
-      thirsty: ctx.open && r() < thirst, thirstAt: -0.35 + r() * 1.25,
-      maxPay: 1.0 * pay * (0.6 + r() * 0.9) * (1 + ctx.reputation * 0.3),
+      thirsty: ctx.open && r() < thirst, thirstAt: -0.35 + r() * 1.25, tourist,
+      maxPay: 1.0 * pay * (0.6 + r() * 0.9) * (1 + ctx.reputation * 0.3) * (ctx.payMul ?? 1) * (tourist ? TOURIST_PAY : 1),
       bought: false, queuedAt: null, checked: new Set(), bubble: null, hop: r() * 6,
     });
   }

@@ -108,7 +108,17 @@
       <div class="step"><b>1</b><h3>Buy lemons</h3><p>On a shared market. Every lemon bought today pushes the price up for everyone. 1 lemon = 2 cups.</p></div>
       <div class="step"><b>2</b><h3>Set your price</h3><p>Hot days pay more, rain pays less. Too pricey and Friends walk past with a "TOO $$$".</p></div>
       <div class="step"><b>3</b><h3>Open the stand</h3><p>Real Rare Friends arrive by ferry, queue up and walk off holding a lemonade.</p></div>
-      <div class="step"><b>4</b><h3>Grow</h3><p>Stands, a pop cart, a juice bar, a grove, a balloon. Hire real Friends to run them.</p></div>
+      <div class="step"><b>4</b><h3>Grow</h3><p>Stands, a pop cart, a juice bar, a grove, a balloon. Hire real Friends to run them. Chase 8 goals.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Island events</h2>
+    <div class="steps">
+      <div class="step"><b>1</b><h3>Cruise ship docks</h3><p>A bigger crowd, and tourists in sun hats pay 30% more. Stock up and nudge your price.</p></div>
+      <div class="step"><b>2</b><h3>Lemon shortage</h3><p>Lemons cost 40% more today. Sell yesterday's stock or raise your price.</p></div>
+      <div class="step"><b>3</b><h3>Rival stand</h3><p>Friends pay 15% less. Price war: cut your price or watch them walk past.</p></div>
+      <div class="step"><b>4</b><h3>Food critic</h3><p>End the day with a HAPPY crowd for +10% reputation. Don't run out.</p></div>
     </div>
   </section>
 
@@ -137,24 +147,25 @@
           <div><span>Unsold lemons</span><span class="tag burn">25% rot overnight</span></div>
         </div>
         <p class="small" style="margin-top:10px">The game never mints RF. It moves between players and Friends, or it burns.</p>
+        <p class="small" style="margin-top:8px"><b>Paired with the real token:</b> the in-game Economy sheet reads the live $RAREFRIENDS supply from Robinhood chain (read-only) and shows what 100, 1K or 10K players would burn. At 10K steady players: about 7.5% of the supply a year.</p>
       </div>
       <div class="panel">
         <h3>30-day simulation · 25 seeds per strategy</h3>
         <table>
           <thead><tr><th>Strategy</th><th>Cups</th><th>Day 60 RF</th><th>Burned</th><th>To Friends</th></tr></thead>
           <tbody>
-            <tr class="win"><td>Steady (good price, builds)</td><td>872</td><td>1,549</td><td>518</td><td>648</td></tr>
-            <tr><td>Bargain (30% cheaper)</td><td>1,179</td><td>1,183</td><td>581</td><td>708</td></tr>
-            <tr><td>Greedy (40% pricier)</td><td>349</td><td>262</td><td>275</td><td>365</td></tr>
-            <tr><td>Saver (never builds)</td><td>341</td><td>689</td><td>60</td><td>60</td></tr>
+            <tr class="win"><td>Steady (good price, builds)</td><td>945</td><td>1,519</td><td>591</td><td>723</td></tr>
+            <tr><td>Bargain (30% cheaper)</td><td>1,164</td><td>800</td><td>573</td><td>696</td></tr>
+            <tr><td>Greedy (40% pricier)</td><td>364</td><td>235</td><td>286</td><td>373</td></tr>
+            <tr><td>Saver (never builds)</td><td>372</td><td>677</td><td>80</td><td>80</td></tr>
           </tbody>
         </table>
         <div class="big">
-          <div><b>518</b><span>RF burned per player / 30 days</span></div>
-          <div><b>648</b><span>RF paid to other Friends</span></div>
-          <div><b>518K</b><span>RF burned a month at 1,000 players</span></div>
+          <div><b>591</b><span>RF burned per player / 30 days</span></div>
+          <div><b>723</b><span>RF paid to other Friends</span></div>
+          <div><b>591K</b><span>RF burned a month at 1,000 players</span></div>
         </div>
-        <p class="small" style="margin-top:10px">Played headlessly with the game's own crowd, market and ledger code (<code>npm run economy</code>). Pricing is a real decision, investing pays like a tycoon should, and the more a player grows the more RF they burn.</p>
+        <p class="small" style="margin-top:10px">Played headlessly with the game's own crowd, market, ledger and island-event code (<code>npm run economy</code>). Pricing is a real decision, investing pays like a tycoon should, and the more a player grows the more RF they burn.</p>
       </div>
     </div>
   </section>

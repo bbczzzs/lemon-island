@@ -19,9 +19,11 @@ Rare Friends Vibeathon · **Economy Potential** · FriendSDK **v0.1.2**
 - **Buy lemons** on a shared market (the price rises as players buy), **set your cup price** for the weather, **open**. Real Rare Friends arrive by ferry and decide whether your lemonade is worth it.
 - **Grow:** more stands, an Ice Pop Cart, a Juice Bar, umbrellas, big jugs, a neon sign, a lemon grove, a tour balloon.
 - **Hire real Friends** to run extra stalls; their wages go into their own wallets.
+- **Island events** shake up the day: a cruise ship full of tourists in sun hats (they pay 30% more), a lemon shortage, a rival stand's price war, a food critic. **8 goals** with trophies give every run a shape.
 - **RF flows:** lemons are 50% burned and 50% paid to farmer Friends; builds are 50% burned and 50% to Friend rewards; a quarter of unsold lemons rot overnight.
 - Weather matters: heatwaves, rain, and a Festival every 7th day.
-- **Proven in simulation:** a steady player burns ~518 RF and pays ~648 RF to other Friends in 30 days; overcharging sells 60% fewer cups; builders overtake savers around day 36 and end day 60 2.2× richer. See [ECONOMY.md](ECONOMY.md).
+- **Paired with the real $RAREFRIENDS token:** the Economy sheet reads the live RF supply from Robinhood chain (one read-only `totalSupply()` call, on demand) and shows what 100, 1K or 10K steady players would burn, as a share of it (10K players ≈ 7.5% a year).
+- **Proven in simulation:** a steady player burns ~591 RF and pays ~723 RF to other Friends in 30 days; overcharging sells 60% fewer cups; builders overtake savers around day 36 and end day 60 2.2× richer. See [ECONOMY.md](ECONOMY.md).
 
 Full rules, economy and checks: [`games/lemon/README.md`](games/lemon/README.md).
 
