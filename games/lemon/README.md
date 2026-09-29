@@ -28,7 +28,7 @@ All RF is **simulated demo RF** (100 to start) and labelled as such. RF never ap
 | **Lemons** | Bought on a shared market: **50% burned, 50% to the farmer Friends' wallets** |
 | **Lemon price** | Player-driven: every lemon bought today lifts the price 0.25%; overnight it moves with total demand (you + rival tycoons), relaxes toward 0.50 RF, and shocks on heatwaves and grove blight |
 | **Buildings & upgrades** | **50% burned, 50% to active Friend rewards** (the Rare Friends 50/50 gameplay-payment rule) |
-| **Helpers** | 3 RF/day each, paid **straight into the hired Friend's own wallet** |
+| **Helpers** | 1.5 RF/day each, paid **straight into the hired Friend's own wallet** |
 | **Spoilage** | 25% of leftover lemons rot overnight, a natural sink that rewards good forecasting |
 
 **What makes it a real economy, not a price table:**
@@ -37,6 +37,9 @@ All RF is **simulated demo RF** (100 to start) and labelled as such. RF never ap
 - **RF circulates between real Friends:** customers, farmers and helpers are all real Generations Friends with their own wallets.
 - **Sinks that scale with success.** Bigger empires buy more lemons, build more and hire more, so they burn more.
 - **An island value leaderboard** against rival tycoons.
+- **A 30-day forecast in the Economy sheet**, played headlessly with the game's own crowd, market and ledger code (`forecast.ts`).
+
+**Proven in simulation** ([ECONOMY.md](../../ECONOMY.md), `npm run economy`, 4 strategies × 25 seeds): a steady player burns ~518 RF and pays ~648 RF to other Friends in 30 days; pricing 40% too high sells 60% fewer cups; builders overtake savers around day 36 and end day 60 2.2× richer; no sensible run goes broke.
 
 ## Rare Friends integration
 
@@ -57,6 +60,7 @@ Controls: **Space** opens the day or starts the next one · **[ ]** change price
 - `npm run typecheck`: strict TypeScript, 0 errors.
 - `node test-interaction.mjs 960` and `390`: in the real sandboxed runtime with the SDK's mock wallet. Covers buying lemons (balance falls by the quoted cost), changing the price, opening the day, cups selling, the evening report, building a stall, hiring a Friend to run it, the Economy sheet and the next morning.
 - `npx friendsdk check games/lemon` and `npx friendsdk test` at 1200 px and 360 px.
+- `npm run economy`: 30-day headless simulation of four strategies × 25 seeds, written to `ECONOMY.md`.
 
 ## Known limitations
 

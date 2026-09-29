@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GameComponentProps } from "@rarefriends/friendsdk/runtime";
 import {
   Ledger, BUILDS, WEATHER, CUPS_PER_LEMON, DAY_SECONDS, HELPER_WAGE, BASE_LEMON,
-  mulberry32, rollWeather, quoteLemons, nextLemonPrice, fmtRf, toRf,
+  mulberry32, rollWeather, quoteLemons, nextLemonPrice, typicalPay, fmtRf, toRf,
   type BuildId, type Weather,
 } from "./economy";
 import { Island, type Stall } from "./sim";
@@ -13,6 +13,7 @@ import { LemonScene, spriteCanvas, type Phase } from "./scene";
 import { LemonAudio } from "./audio";
 import { loadPilot, type PilotSprite } from "./pilot";
 import { Px, WEATHER_ICON, type IconName } from "./icons";
+import { simulateIsland, type DayStat } from "./forecast";
 import "./style.css";
 
 type Sheet = "lemons" | "build" | "staff" | "economy";
@@ -26,6 +27,24 @@ function avatar(key: string, rows: SpriteRows | undefined): string {
   let url = avatarCache.get(key);
   if (!url) { url = spriteCanvas(rows).toDataURL(); avatarCache.set(key, url); }
   return url;
+}
+
+/** Cumulative RF burned and paid to Friends (lines) over the player's balance (bars). */
+function ForecastChart({ days }: { days: DayStat[] }) {
+  const W = 300, H = 78, pad = 5;
+  const max = Math.max(...days.map(d => Math.max(d.toFriends, d.burned, d.balance)), 1);
+  const x = (i: number) => pad + (i / Math.max(1, days.length - 1)) * (W - pad * 2);
+  const y = (v: number) => H - pad - (Math.max(0, v) / max) * (H - pad * 2);
+  const line = (k: "burned" | "toFriends") => days.map((d, i) => `${x(i).toFixed(1)},${y(d[k]).toFixed(1)}`).join(" ");
+  const bw = Math.max(2, (W - pad * 2) / days.length - 2);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="li-fc-chart" aria-hidden="true">
+      {days.map((d, i) => <rect key={d.day} x={x(i) - bw / 2} y={y(d.balance)} width={bw} height={H - pad - y(d.balance)} fill="#F2CE68" opacity="0.55" />)}
+      <line x1={pad} x2={W - pad} y1={H - pad} y2={H - pad} stroke="#111" strokeWidth="1.5" />
+      <polyline points={line("toFriends")} fill="none" stroke="#7fa653" strokeWidth="3" strokeLinejoin="bevel" />
+      <polyline points={line("burned")} fill="none" stroke="#c2481f" strokeWidth="3" strokeLinejoin="bevel" />
+    </svg>
+  );
 }
 
 /**
@@ -65,6 +84,7 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
   const [candidates, setCandidates] = useState<RosterFriend[]>([]);
   const [pops, setPops] = useState<{ id: number; v: number }[]>([]);
   const popId = useRef(0);
+  const forecastRef = useRef<DayStat[] | null>(null);
   const rerender = () => setTick(t => (t + 1) % 1_000_000);
 
   function toast(text: string, kind: Toast["kind"] = "info") {
@@ -197,11 +217,9 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
     }
   }
 
-  function typicalPay(): number {
+  function typicalToday(): number {
     const g = game.current;
-    const w = WEATHER[g.weather];
-    // What most Friends will happily pay today (about 6 in 10 say yes at this price).
-    return 0.95 * (g.weather === "rain" && upgradesRef.current.has("umbrella") ? 0.9 : w.pay) * (1 + g.reputation * 0.3);
+    return typicalPay(g.weather, upgradesRef.current.has("umbrella"), g.reputation);
   }
 
   function openDay() {
@@ -338,7 +356,7 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
   const w = WEATHER[g.weather];
   const fc = WEATHER[g.forecast];
   const cups = Math.floor(ledger.lemons * CUPS_PER_LEMON + 1e-9);
-  const typical = typicalPay();
+  const typical = typicalToday();
   const priceState = g.price > typical * 1.06 ? "high" : g.price < typical * 0.6 ? "low" : "good";
   const moodKey = g.mood > 0.6 ? "good" : g.mood > 0.3 ? "ok" : "bad";
   const buildValue = BUILDS.reduce((a, b) => a + owned(b.id) * b.cost, 0) + 40;
@@ -364,6 +382,10 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
   const hMax = Math.max(...hist, 0.8), hMin = Math.min(...hist, 0.3);
   const sparkY = (v: number) => 31 - ((v - hMin) / Math.max(0.01, hMax - hMin)) * 28;
   const t = ledger.total;
+  // Simulated once, on first open: 30 days of a steady player with the game's own crowd, market and ledger.
+  if (sheet === "economy" && !forecastRef.current) forecastRef.current = simulateIsland(ROSTER, 30, 11);
+  const fcDays = forecastRef.current;
+  const fcLast = fcDays?.[fcDays.length - 1];
 
   const toggle = (x: Sheet) => { setSheet(v => (v === x ? null : x)); audioRef.current?.tick(560); };
   const SHEETS: Record<Sheet, { title: string; icon: IconName }> = {
@@ -520,7 +542,7 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
             </div>
           )}
           {sheet === "economy" && (
-            <div className="li-sheet-body li-cols">
+            <div className="li-sheet-body li-econ">
               <div className="li-flow">
                 <div className="in"><span>Customers paid you</span><strong>+{fmtRf(t.sales)}</strong></div>
                 <div><span>Lemons → burned <Px name="flame" size={12} /></span><strong>{fmtRf(t.lemons / 2n)}</strong></div>
@@ -530,8 +552,21 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
                 <div><span>Wages → helper wallets</span><strong>{fmtRf(t.wages)}</strong></div>
                 <div className="tot"><span>Total burned</span><strong><Px name="flame" size={14} />{fmtRf(t.burned)} RF</strong></div>
               </div>
-              <div>
-                <h4>Richest islands</h4>
+              {fcDays && fcLast && (
+                <div className="li-forecast">
+                  <h4>30-day forecast · simulated with this game's own code</h4>
+                  <ForecastChart days={fcDays} />
+                  <p className="li-fc-legend"><i className="burn" />burned <i className="friends" />paid to Friends <i className="bal" />balance</p>
+                  <div className="li-fc-stats">
+                    <div><Px name="flame" size={16} /><b>{fmtRf(Math.round(fcLast.burned))}</b><span>RF burned</span></div>
+                    <div><Px name="people" size={16} /><b>{fmtRf(Math.round(fcLast.toFriends))}</b><span>RF to Friends</span></div>
+                    <div><Px name="stand" size={16} /><b>{fcLast.stalls}</b><span>stalls</span></div>
+                  </div>
+                  <p className="li-fc-scale">A steady tycoon for 30 days. × 1,000 players ≈ <b>{fmtRf(Math.round(fcLast.burned * 1000))} RF</b> burned a month.</p>
+                </div>
+              )}
+              <div className="li-board-strip">
+                <h4>Richest islands <small>{t.cups} cups sold · {t.spoiled} lemons rotted · rivals simulated · demo RF</small></h4>
                 <ol className="li-board">
                   {board.map((b, i) => (
                     <li key={b.name} className={b.me ? "me" : ""}>
@@ -542,7 +577,6 @@ export default function LemonIsland({ friendId, client, paused }: GameComponentP
                     </li>
                   ))}
                 </ol>
-                <p className="li-note">{t.cups} cups sold · {t.spoiled} lemons rotted · rivals simulated · demo RF</p>
               </div>
             </div>
           )}

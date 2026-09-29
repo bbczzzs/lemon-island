@@ -7,6 +7,8 @@ Rare Friends Vibeathon · **Economy Potential** · FriendSDK **v0.1.2**
 ![Lemon Island gameplay](media/lemon-demo.gif)
 
 🎮 **Play:** https://bbczzzs.github.io/lemon-island/ requires a browser wallet on Robinhood mainnet (4663) holding a hardwired Rare Friends Generations NFT (gen ≥ 1), the SDK's standard gate. All RF is **simulated demo RF**.
+👀 **No wallet? Preview page:** https://bbczzzs.github.io/lemon-island/preview/ (GIF, video, screens, economy)
+📈 **[Economy report](ECONOMY.md):** 30-day simulation of four play styles × 25 seeds, run on the game's own code (`npm run economy`)
 🎬 [Full recording (MP4)](media/lemon-demo.mp4)
 
 | Morning market | Selling day | Evening report | Build your empire |
@@ -19,6 +21,7 @@ Rare Friends Vibeathon · **Economy Potential** · FriendSDK **v0.1.2**
 - **Hire real Friends** to run extra stalls; their wages go into their own wallets.
 - **RF flows:** lemons are 50% burned and 50% paid to farmer Friends; builds are 50% burned and 50% to Friend rewards; a quarter of unsold lemons rot overnight.
 - Weather matters: heatwaves, rain, and a Festival every 7th day.
+- **Proven in simulation:** a steady player burns ~518 RF and pays ~648 RF to other Friends in 30 days; overcharging sells 60% fewer cups; builders overtake savers around day 36 and end day 60 2.2× richer. See [ECONOMY.md](ECONOMY.md).
 
 Full rules, economy and checks: [`games/lemon/README.md`](games/lemon/README.md).
 
@@ -28,9 +31,10 @@ npm install
 npx friendsdk dev games/lemon                    # local preview (real wallet gate)
 npx friendsdk build games/lemon --outdir dist    # static build
 npm run typecheck
+npm run economy                                  # regenerates ECONOMY.md from the game's own sim
 node test-interaction.mjs 960                    # needs: npx playwright install chromium
 ```
 
-The repo root (`index.html`, `game.*`, `runtime.*`, `assets/`) is the built static preview served by GitHub Pages.
+The repo root (`index.html`, `game.*`, `runtime.*`, `assets/`) is the built static preview served by GitHub Pages; `preview/` is the no-wallet landing page.
 
 All art is drawn in code, all audio is synthesized, and Friend sprites are canonical Rare Friends artwork via FriendSDK. Fonts: Silkscreen, Sometype Mono, Archivo (SIL OFL).

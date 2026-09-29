@@ -42,14 +42,14 @@ export interface Build {
   blurb: string;
 }
 export const BUILDS: Build[] = [
-  { id: "stand", name: "Lemon Stand", cost: 40, kind: "stall", max: 2, blurb: "A second stand further down the beach catches more thirsty Friends." },
-  { id: "cart", name: "Ice Pop Cart", cost: 70, kind: "stall", max: 1, blurb: "Sells frozen pops at 1.4× price. Loves heatwaves, hates rain." },
-  { id: "bar", name: "Juice Bar", cost: 150, kind: "stall", max: 1, blurb: "Premium fizz at 2× price. Uses 2× lemons." },
-  { id: "umbrella", name: "Umbrellas", cost: 30, kind: "upgrade", max: 1, blurb: "Rainy days aren't a washout any more." },
-  { id: "jug", name: "Big Jugs", cost: 45, kind: "upgrade", max: 1, blurb: "Serve 40% faster." },
-  { id: "sign", name: "Neon Sign", cost: 60, kind: "upgrade", max: 1, blurb: "+20% of passers-by stop to look." },
-  { id: "farm", name: "Lemon Grove", cost: 180, kind: "upgrade", max: 1, blurb: "Grows 12 free lemons every morning." },
-  { id: "balloon", name: "Tour Balloon", cost: 260, kind: "upgrade", max: 1, blurb: "Brings +35% tourists to the island." },
+  { id: "stand", name: "Lemon Stand", cost: 30, kind: "stall", max: 2, blurb: "A second stand further down the beach catches more thirsty Friends." },
+  { id: "cart", name: "Ice Pop Cart", cost: 55, kind: "stall", max: 1, blurb: "Sells frozen pops at 1.4× price. Loves heatwaves, hates rain." },
+  { id: "bar", name: "Juice Bar", cost: 120, kind: "stall", max: 1, blurb: "Premium fizz at 2× price. Uses 2× lemons." },
+  { id: "umbrella", name: "Umbrellas", cost: 25, kind: "upgrade", max: 1, blurb: "Rainy days aren't a washout any more." },
+  { id: "jug", name: "Big Jugs", cost: 35, kind: "upgrade", max: 1, blurb: "Serve 40% faster." },
+  { id: "sign", name: "Neon Sign", cost: 45, kind: "upgrade", max: 1, blurb: "+20% of passers-by stop to look." },
+  { id: "farm", name: "Lemon Grove", cost: 150, kind: "upgrade", max: 1, blurb: "Grows 12 free lemons every morning." },
+  { id: "balloon", name: "Tour Balloon", cost: 200, kind: "upgrade", max: 1, blurb: "Brings +35% tourists to the island." },
 ];
 export const buildById = (id: BuildId) => BUILDS.find(b => b.id === id)!;
 
@@ -60,7 +60,7 @@ export const STALLS: Record<"stand" | "cart" | "bar", { priceMul: number; lemons
   bar: { priceMul: 2, lemonsMul: 2, weather: { festival: 1.3 } },
 };
 
-export const HELPER_WAGE = 3; // RF per day, paid to the helper Friend's wallet
+export const HELPER_WAGE = 1.5; // RF per day, paid to the helper Friend's wallet
 
 export function mulberry32(a: number): () => number {
   return function () {
@@ -102,6 +102,15 @@ export function nextLemonPrice(price: number, playerBought: number, rivalBought:
   if (rand() < 0.08) p *= 1.35; // grove blight
   p *= 0.97 + rand() * 0.06;
   return Math.max(0.25, Math.min(1.6, Math.round(p * 1000) / 1000));
+}
+
+/**
+ * What most Friends will happily pay for a cup today (about 6 in 10 say yes at
+ * this price). Drives the in-game "good price" guidance and the forecast.
+ */
+export function typicalPay(weather: Weather, hasUmbrella: boolean, reputation: number): number {
+  const pay = weather === "rain" && hasUmbrella ? 0.9 : WEATHER[weather].pay;
+  return 0.95 * pay * (1 + reputation * 0.3);
 }
 
 export interface Flows {

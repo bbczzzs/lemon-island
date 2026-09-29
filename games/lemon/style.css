@@ -163,7 +163,7 @@
 .li-staff button.hire:hover { background: var(--signal); }
 .li-av { width: 34px; height: 34px; image-rendering: pixelated; background: var(--white); border: var(--line); flex: none; display: inline-block; }
 .li-flow { border: var(--line); background: var(--white); align-self: start; box-shadow: var(--drop); }
-.li-flow div { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 2px dotted var(--rule); font: 12px var(--mono); }
+.li-flow div { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 12px; border-bottom: 2px dotted var(--rule); font: 12px var(--mono); }
 .li-flow span { display: flex; align-items: center; gap: 5px; color: var(--muted); }
 .li-flow .in strong { background: var(--signal); padding: 0 5px; border: 2px solid var(--ink); }
 .li-flow .tot { border-bottom: 0; background: var(--ink); color: var(--paper); }
@@ -175,6 +175,26 @@
 .li-board .v { font: 700 13px var(--display); }
 .li-board li.me { font-weight: 700; background: var(--signal); margin: 2px -8px; padding: 5px 8px; border: var(--line); box-shadow: 2px 2px 0 var(--ink); }
 .li-board li.me .pos { color: var(--ink); }
+.li-econ { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.li-forecast { padding: 10px 12px; background: var(--white); border: var(--line); box-shadow: var(--drop); }
+.li-fc-chart { display: block; width: 100%; height: auto; }
+.li-fc-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 2px 0 6px; font: 10px var(--mono); color: var(--muted); }
+.li-fc-legend i { display: inline-block; width: 14px; height: 4px; margin-right: -6px; }
+.li-fc-legend .burn { background: var(--fire); }
+.li-fc-legend .friends { background: #7fa653; }
+.li-fc-legend .bal { height: 10px; width: 8px; background: var(--sun); }
+.li-fc-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.li-fc-stats div { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 4px; background: var(--paper); border: 2px solid var(--ink); font: 9px var(--mono); color: var(--muted); text-align: center; }
+.li-fc-stats b { font: 700 14px/1 var(--display); color: var(--ink); }
+.li-fc-scale { margin: 6px 0 0; padding: 5px 8px; background: var(--signal); border: 2px solid var(--ink); font: 11px/1.4 var(--mono); }
+.li-board-strip { grid-column: 1 / -1; }
+.li-board-strip h4 small { font: 10px var(--mono); letter-spacing: 0; text-transform: none; color: var(--faint); margin-left: 6px; }
+.li-board-strip .li-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.li-board-strip .li-board li { grid-template-columns: auto 24px 1fr auto; gap: 5px; padding: 4px 6px; border: 2px solid var(--ink); background: var(--white); }
+.li-board-strip .li-board li.me { margin: 0; padding: 4px 6px; }
+.li-board-strip .li-av { width: 24px; height: 24px; border-width: 1px; }
+.li-board-strip .v { font-size: 11px; }
+.li-board-strip .nm { font: 10px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- the dock ---------- */
 .li-bar { position: absolute; left: 50%; bottom: 54px; transform: translateX(-50%); display: flex; align-items: stretch; gap: 8px; padding: 8px; background: var(--paper); border: var(--line); box-shadow: 5px 5px 0 var(--ink); z-index: 4; max-width: calc(100% - 24px); }
@@ -229,6 +249,8 @@
   .li-burnpill span:last-child, .li-demo, .li-clock { display: none; }
   .li-builds { grid-template-columns: repeat(2, 1fr); }
   .li-cols { grid-template-columns: 1fr; }
+  .li-econ { grid-template-columns: 1fr; }
+  .li-board-strip .li-board { grid-template-columns: repeat(2, 1fr); }
   .li-btn { min-width: 0; padding: 6px 8px; }
   .li-go { min-width: 124px; padding: 8px 12px 10px; }
   .li-go kbd { display: none; }
@@ -246,6 +268,9 @@
   .li-toasts { top: 168px; }
   .li-bar { left: 10px; right: 10px; transform: none; max-width: none; bottom: 48px; display: grid; grid-template-columns: repeat(4, 1fr); }
   .li-pricebox, .li-go { grid-column: span 2; order: 1; min-width: 0; }
+  .li-pricebox { grid-template-columns: 34px minmax(0, 1fr) 34px; overflow: hidden; }
+  .li-pricebox div { min-width: 0; padding: 4px 6px; }
+  .li-pricebox em { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .li-btn { order: 2; }
   .li-btn-lemon b { font-size: 14px; }
   .li-card { top: 44%; }
