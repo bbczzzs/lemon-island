@@ -1,7 +1,7 @@
 {
   "name": "lemon-island",
   "version": "1.0.0",
-  "description": "Lemon Island Tycoon — a lemonade tycoon on a floating island for the Rare Friends Vibeathon (Economy Potential), built with FriendSDK v0.1.2",
+  "description": "Lemon Island Tycoon — a lemonade tycoon on a floating island for the Rare Friends Vibeathon (Economy Potential), built with FriendSDK v0.1.4",
   "license": "Apache-2.0",
   "scripts": {
     "dev": "friendsdk dev games/lemon",
@@ -12,7 +12,7 @@
     "economy": "esbuild tools/economy-report.ts --bundle --platform=node --format=esm --outfile=.friendsdk/economy-report.mjs --log-level=warning && node .friendsdk/economy-report.mjs"
   },
   "dependencies": {
-    "@rarefriends/friendsdk": "https://github.com/spokesz/friendsdk/releases/download/v0.1.2/rarefriends-friendsdk-0.1.2.tgz",
+    "@rarefriends/friendsdk": "https://github.com/spokesz/friendsdk/releases/download/v0.1.4/rarefriends-friendsdk-0.1.4.tgz",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

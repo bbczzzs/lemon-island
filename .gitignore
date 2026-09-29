@@ -4,3 +4,4 @@ node_modules/
 artifacts/
 .friendsdk/
 games/lemon/.friendsdk/
+dist/

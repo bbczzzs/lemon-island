@@ -2,7 +2,7 @@
 
 **Your Rare Friend opens a lemonade stand on a sunny beach island and grows it into a juice empire, in a living economy where lemon prices move with demand, RF circulates between real Friends, and every build burns RF.**
 
-Rare Friends Vibeathon · **Economy Potential** · FriendSDK **v0.1.2**
+Rare Friends Vibeathon · **Economy Potential** · FriendSDK **v0.1.4**
 
 ![Lemon Island gameplay](media/lemon-demo.gif)
 
